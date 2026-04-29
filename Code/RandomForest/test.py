@@ -11,15 +11,11 @@ import numpy as np
 import os
 #print(os.listdir('C:/Users/rider/OneDrive/Documents/GitHub/486-Final-Project/Code/RandomForest/Mnist'))
 
-from sklearn.datasets import fetch_openml
-from sklearn.tree import DecisionTreeClassifier as dtc
 from PIL import Image
-#from sklearn.tree import decisiontreeregression
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-import matplotlib.pyplot as plt
-from sklearn.tree import plot_tree
 from sklearn.ensemble import RandomForestClassifier as rfc
+from sklearn.model_selection import cross_val_score, cross_val_predict
+from sklearn.metrics import f1_score
 
 #================= CODE =====================
 def main():
@@ -39,17 +35,22 @@ def main():
     X_test = np.array(X_test) / 255.0
     Y_test = np.array(Y_test)
 
-
     #Make forest
-    forest = rfc(n_estimators=100, random_state = 40)
+    #Tried tweaking values like max_depth, min_leafs, etc but it didn't help it
+    #n_jobs = -1 made it run a bit faster at least
+    forest = rfc(n_estimators = 200, random_state = 2, n_jobs = -1)
 
+    #Tried cross validating, didn't really change anything for accuracy
+    #Y_train_after_folds = cross_val_predict(forest, X_train, Y_train, cv=5, n_jobs=-1)
+    #f1_cv = f1_score(Y_train, Y_train_after_folds, average='macro')
+    
     #Fit it do the training data
     forest.fit(X_train, Y_train)
     
     #Get accuracy
     y_pred_forest = forest.predict(X_test)
-    acc_forest = accuracy_score(Y_test, y_pred_forest)
-    print(f"The accuray of the forest is {acc_forest}")
+    acc_forest_training = accuracy_score(Y_test, y_pred_forest)
+    
 
     #======================= THIS IS WHERE YOU WOULD CHANGE THE DATA =============================
     
@@ -58,10 +59,12 @@ def main():
     
     #=============================================================================================
     
-    #This is being called from a different function
-    X_new, new_Y_test, names = load_custom_images(pictures_to_compare)
+    #This function reads the images from the folder in github and makes a new x and y set
+    #To see how well the model does
+    #Also returns names to print out to user to see what got missed
+    X_new, Y_new, names = load_custom_images(pictures_to_compare)
     X_new = np.array(X_new)
-    new_Y_test = np.array(new_Y_test)
+    Y_new = np.array(Y_new)
 
     #Predict
     predictions = forest.predict(X_new)
@@ -70,43 +73,39 @@ def main():
         
     #Get accuracy
     y_pred_forest = forest.predict(X_new)
-    acc_forest = accuracy_score(new_Y_test, y_pred_forest)
-    print(f"The accuray for the custom numbers is: {acc_forest}")
+    acc_forest_custom = accuracy_score(Y_new, y_pred_forest)
+    print(f"The accuracy after training forest: {acc_forest_training * 100:,.2f}%")
+    print(f"The accuracy for predicting numbers: {acc_forest_custom * 100:,.2f}%")
+    #print(f"Cross-validated f1 (from predictions): {f1_cv:,.2f}")
 
-def load_custom_images(folder_path):
+#Function that handles loading the custom images
+#Also looked this up, thanks OS!
+def load_custom_images(file_name):
     
-    #Make parallel arrays for the data and labels
-    data = []
-    filenames = []
-    labels = []
+    #Make parallel arrays for the data and lables    
+    x_new = []
+    y_new = []
+    names = []
+    
+    for file in os.listdir(file_name):
 
-    #For each file
-    for file in os.listdir(folder_path):
-     
-        
-        
-        img_path = os.path.join(folder_path, file)
+        img_path = os.path.join(file_name, file)
         img = Image.open(img_path).convert('L')
-        img = img.resize((28, 28))
 
+        img = img.resize((28,28))
         img_array = np.array(img)
 
-        # get values between 0 and 1
+        # Normalize
         img_array = img_array / 255.0
 
+        #Flatten
         img_array = img_array.flatten()
 
-        #Append the formatted data
-        data.append(img_array)
-        
-        #Append the file
-        filenames.append(file)
-        
-        #Get the label of it (the first index)
-        labels.append(int(file[0]))
+        x_new.append(img_array)
+        y_new.append(int(file[0]))
+        names.append(file)
 
-    #Return everything
-    return data, labels, filenames
+    return x_new, y_new, names
 
 if __name__ == "__main__":
     main()
